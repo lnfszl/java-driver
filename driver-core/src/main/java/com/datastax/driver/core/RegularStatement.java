@@ -51,7 +51,8 @@ public abstract class RegularStatement extends Statement {
      *
      * @return the values to use for this statement or {@code null} if there is
      * no such values.
-     *
+     * @throws IllegalArgumentException if one of the values is not of a type
+     * that can be serialized to a CQL3 type
      * @see SimpleStatement#SimpleStatement(String, Object...)
      */
     public abstract ByteBuffer[] getValues();

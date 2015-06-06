@@ -16,6 +16,7 @@
 package com.datastax.driver.core;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 /**
  * A simple {@code RegularStatement} implementation built directly from a query
@@ -24,7 +25,7 @@ import java.nio.ByteBuffer;
 public class SimpleStatement extends RegularStatement {
 
     private final String query;
-    private final ByteBuffer[] values;
+    private final Object[] values;
 
     private volatile ByteBuffer routingKey;
     private volatile String keyspace;
@@ -77,32 +78,12 @@ public class SimpleStatement extends RegularStatement {
      *
      * @param query the query string.
      * @param values values required for the execution of {@code query}.
-     *
-     * @throws IllegalArgumentException if one of {@code values} is not of a type
-     * corresponding to a CQL3 type, i.e. is not a Class that could be returned
-     * by {@link DataType#asJavaClass}.
      */
     public SimpleStatement(String query, Object... values) {
         if (values.length > 65535)
             throw new IllegalArgumentException("Too many values, the maximum allowed is 65535");
         this.query = query;
-        this.values = convert(values);
-    }
-
-    private static ByteBuffer[] convert(Object[] values) {
-        ByteBuffer[] serializedValues = new ByteBuffer[values.length];
-        for (int i = 0; i < values.length; i++) {
-            Object value = values[i];
-            try {
-                if (value instanceof Token)
-                    value = ((Token)value).getValue();
-                serializedValues[i] = DataType.serializeValue(value);
-            } catch (IllegalArgumentException e) {
-                // Catch and rethrow to provide a more helpful error message (one that include which value is bad)
-                throw new IllegalArgumentException(String.format("Value %d of type %s does not correspond to any CQL3 type", i, value.getClass()));
-            }
-        }
-        return serializedValues;
+        this.values = values;
     }
 
     /**
@@ -117,7 +98,17 @@ public class SimpleStatement extends RegularStatement {
 
     @Override
     public ByteBuffer[] getValues() {
-        return values;
+        return values == null ? null : CodecUtils.convert(Arrays.asList(values), getCodecRegistry());
+    }
+
+    /**
+     * The number of values for this statement, that is the size of the array
+     * that will be returned by {@code getValues}.
+     *
+     * @return the number of values.
+     */
+    public int valuesCount() {
+        return values == null ? 0 : values.length;
     }
 
     /**
@@ -221,19 +212,18 @@ public class SimpleStatement extends RegularStatement {
             totalLength += 2 + bb.remaining() + 1;
 
         ByteBuffer out = ByteBuffer.allocate(totalLength);
-        for (ByteBuffer buffer : buffers)
-        {
+        for (ByteBuffer buffer : buffers) {
             ByteBuffer bb = buffer.duplicate();
             putShortLength(out, bb.remaining());
             out.put(bb);
-            out.put((byte) 0);
+            out.put((byte)0);
         }
         out.flip();
         return out;
     }
 
     private static void putShortLength(ByteBuffer bb, int length) {
-        bb.put((byte) ((length >> 8) & 0xFF));
-        bb.put((byte) (length & 0xFF));
+        bb.put((byte)((length >> 8) & 0xFF));
+        bb.put((byte)(length & 0xFF));
     }
 }

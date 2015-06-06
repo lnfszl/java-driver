@@ -25,6 +25,8 @@ import static org.testng.Assert.*;
 
 import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.Statement;
+import com.datastax.driver.core.exceptions.CodecNotFoundException;
+
 import static com.datastax.driver.core.querybuilder.QueryBuilder.*;
 
 public class QueryBuilderTest {
@@ -628,7 +630,7 @@ public class QueryBuilderTest {
         try {
             update("foo").with(set("a", new byte[13])).where(eq("k", 2)).toString();
             fail("Byte arrays should not be valid, ByteBuffer should be used instead");
-        } catch (IllegalArgumentException e) {
+        } catch (CodecNotFoundException e) {
             // Ok, that's what we expect
         }
     }
@@ -687,11 +689,11 @@ public class QueryBuilderTest {
 
     @Test(groups = "unit", expectedExceptions = IllegalArgumentException.class)
     public void should_fail_if_built_statement_has_too_many_values() {
-        List<Object> values = Collections.<Object>nCopies(65535, "a");
+        List<Object> values = Collections.<Object>nCopies(65535, 1);
 
         // If the excessive count results from successive DSL calls, we don't check it on the fly so this statement works:
         BuiltStatement statement = select().all().from("foo")
-            .where(eq("bar", "a"))
+            .where(eq("bar", 1))
             .and(in("baz", values.toArray()));
 
         // But we still want to check it client-side, to fail fast instead of sending a bad query to Cassandra.

@@ -213,7 +213,7 @@ public abstract class Token implements Comparable<Token> {
 
             @Override
             Token deserialize(ByteBuffer buffer) {
-                return new M3PToken((Long) getTokenType().deserialize(buffer));
+                return new M3PToken(TypeCodec.BigintCodec.instance.deserialize(buffer));
             }
 
             @Override
@@ -532,7 +532,7 @@ public abstract class Token implements Comparable<Token> {
 
             @Override
             Token deserialize(ByteBuffer buffer) {
-                return new RPToken((BigInteger)getTokenType().deserialize(buffer));
+                return new RPToken(TypeCodec.BigIntegerCodec.instance.deserialize(buffer));
             }
 
             @Override

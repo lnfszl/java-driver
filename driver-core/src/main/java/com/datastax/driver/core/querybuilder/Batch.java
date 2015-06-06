@@ -17,10 +17,10 @@ package com.datastax.driver.core.querybuilder;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import com.datastax.driver.core.RegularStatement;
+import com.datastax.driver.core.SimpleStatement;
 
 /**
  * A built BATCH statement.
@@ -48,7 +48,7 @@ public class Batch extends BuiltStatement {
     }
 
     @Override
-    StringBuilder buildQueryString(List<ByteBuffer> variables) {
+    StringBuilder buildQueryString(List<Object> variables) {
         StringBuilder builder = new StringBuilder();
 
         builder.append(isCounterOp()
@@ -57,7 +57,7 @@ public class Batch extends BuiltStatement {
 
         if (!usings.usings.isEmpty()) {
             builder.append(" USING ");
-            Utils.joinAndAppend(builder, " AND ", usings.usings, variables);
+            Utils.joinAndAppend(builder, getCodecRegistry(), " AND ", usings.usings, variables);
         }
         builder.append(' ');
 
@@ -110,8 +110,7 @@ public class Batch extends BuiltStatement {
             // For non-BuiltStatement, we cannot know if it includes a bind makers and we assume it does. In practice,
             // this means we will always serialize values as strings when there is non-BuiltStatement
             this.hasBindMarkers = true;
-            if (statement.getValues() != null)
-                this.nonBuiltStatementValues += statement.getValues().length;
+            this.nonBuiltStatementValues += ((SimpleStatement)statement).valuesCount();
         }
 
         checkForBindMarkers(null);

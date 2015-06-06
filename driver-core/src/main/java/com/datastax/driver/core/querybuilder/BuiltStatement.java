@@ -36,7 +36,7 @@ public abstract class BuiltStatement extends RegularStatement {
 
     private boolean dirty;
     private String cache;
-    private ByteBuffer[] values;
+    private List<Object> values;
 
     Boolean isCounterOp;
     boolean hasNonIdempotentOps;
@@ -64,7 +64,6 @@ public abstract class BuiltStatement extends RegularStatement {
         return lowercaseId.matcher(ident).matches() ? ident : Metadata.quote(ident);
     }
 
-
     @Override
     public String getQueryString() {
         maybeRebuildCache();
@@ -81,14 +80,14 @@ public abstract class BuiltStatement extends RegularStatement {
         if (hasBindMarkers || forceNoValues) {
             sb = buildQueryString(null);
         } else {
-            List<ByteBuffer> l = new ArrayList<ByteBuffer>();
-            sb = buildQueryString(l);
+            values = new ArrayList<Object>();
+            sb = buildQueryString(values);
 
-            if (l.size() > 65535)
+            if (values.size() > 65535)
                 throw new IllegalArgumentException("Too many values for built statement, the maximum allowed is 65535");
 
-            if (!l.isEmpty())
-                values = l.toArray(new ByteBuffer[l.size()]);
+            if (values.isEmpty())
+                values = null;
         }
 
         maybeAddSemicolon(sb);
@@ -111,7 +110,7 @@ public abstract class BuiltStatement extends RegularStatement {
         return sb;
     }
 
-    abstract StringBuilder buildQueryString(List<ByteBuffer> variables);
+    abstract StringBuilder buildQueryString(List<Object> variables);
 
     boolean isCounterOp() {
         return isCounterOp == null ? false : isCounterOp;
@@ -148,7 +147,8 @@ public abstract class BuiltStatement extends RegularStatement {
 
         for (int i = 0; i < partitionKey.size(); i++) {
             if (name.equals(partitionKey.get(i).getName()) && Utils.isRawValue(value)) {
-                routingKey[i] = partitionKey.get(i).getType().parse(Utils.toRawString(value));
+                TypeCodec<Object> codec = getCodecRegistry().codecFor(partitionKey.get(i).getType());
+                routingKey[i] = codec.serialize(value);
                 return;
             }
         }
@@ -176,7 +176,7 @@ public abstract class BuiltStatement extends RegularStatement {
     @Override
     public ByteBuffer[] getValues() {
         maybeRebuildCache();
-        return values;
+        return values == null ? null : CodecUtils.convert(values, getCodecRegistry());
     }
 
     @Override
@@ -195,6 +195,12 @@ public abstract class BuiltStatement extends RegularStatement {
             return getQueryString();
 
         return maybeAddSemicolon(buildQueryString(null)).toString();
+    }
+
+    // Not meant to be public
+    List<Object> getRawValues() {
+        maybeRebuildCache();
+        return values;
     }
 
     /**
@@ -272,7 +278,7 @@ public abstract class BuiltStatement extends RegularStatement {
         }
 
         @Override
-        StringBuilder buildQueryString(List<ByteBuffer> values) {
+        StringBuilder buildQueryString(List<Object> values) {
             return statement.buildQueryString(values);
         }
 
@@ -300,6 +306,11 @@ public abstract class BuiltStatement extends RegularStatement {
         public RegularStatement setForceNoValues(boolean forceNoValues) {
             statement.setForceNoValues(forceNoValues);
             return this;
+        }
+
+        @Override
+        List<Object> getRawValues() {
+            return statement.getRawValues();
         }
 
         @Override

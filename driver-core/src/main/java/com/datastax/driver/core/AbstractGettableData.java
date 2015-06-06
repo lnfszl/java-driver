@@ -21,16 +21,23 @@ import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.*;
 
-import com.google.common.collect.Lists;
+import com.google.common.reflect.TypeParameter;
+import com.google.common.reflect.TypeToken;
 
 import com.datastax.driver.core.exceptions.InvalidTypeException;
+
+import static com.datastax.driver.core.DataType.Name.*;
+import static com.datastax.driver.core.DataType.*;
 
 abstract class AbstractGettableData implements GettableData {
 
     protected final ColumnDefinitions metadata;
 
-    protected AbstractGettableData(ColumnDefinitions metadata) {
+    protected final CodecRegistry codecRegistry;
+
+    protected AbstractGettableData(ColumnDefinitions metadata, CodecRegistry codecRegistry) {
         this.metadata = metadata;
+        this.codecRegistry = codecRegistry;
     }
 
     protected abstract ByteBuffer getValue(int i);
@@ -45,13 +52,13 @@ abstract class AbstractGettableData implements GettableData {
     }
 
     public boolean getBool(int i) {
-        metadata.checkType(i, DataType.Name.BOOLEAN);
+        metadata.checkType(i, BOOLEAN);
 
         ByteBuffer value = getValue(i);
         if (value == null || value.remaining() == 0)
             return false;
 
-        return TypeCodec.BooleanCodec.instance.deserializeNoBoxing(value);
+        return getCodecRegistry().codecFor(cboolean(), Boolean.class).deserialize(value);
     }
 
     public boolean getBool(String name) {
@@ -59,13 +66,13 @@ abstract class AbstractGettableData implements GettableData {
     }
 
     public int getInt(int i) {
-        metadata.checkType(i, DataType.Name.INT);
+        metadata.checkType(i, INT);
 
         ByteBuffer value = getValue(i);
         if (value == null || value.remaining() == 0)
             return 0;
 
-        return TypeCodec.IntCodec.instance.deserializeNoBoxing(value);
+        return getCodecRegistry().codecFor(cint(), Integer.class).deserialize(value);
     }
 
     public int getInt(String name) {
@@ -73,13 +80,13 @@ abstract class AbstractGettableData implements GettableData {
     }
 
     public long getLong(int i) {
-        metadata.checkType(i, DataType.Name.BIGINT, DataType.Name.COUNTER);
+        metadata.checkType(i, BIGINT, COUNTER);
 
         ByteBuffer value = getValue(i);
         if (value == null || value.remaining() == 0)
             return 0L;
 
-        return TypeCodec.LongCodec.instance.deserializeNoBoxing(value);
+        return getCodecRegistry().codecFor(metadata.getType(i), Long.class).deserialize(value);
     }
 
     public long getLong(String name) {
@@ -87,13 +94,13 @@ abstract class AbstractGettableData implements GettableData {
     }
 
     public Date getDate(int i) {
-        metadata.checkType(i, DataType.Name.TIMESTAMP);
+        metadata.checkType(i, TIMESTAMP);
 
         ByteBuffer value = getValue(i);
         if (value == null || value.remaining() == 0)
             return null;
 
-        return TypeCodec.DateCodec.instance.deserialize(value);
+        return getCodecRegistry().codecFor(timestamp(), Date.class).deserialize(value);
     }
 
     public Date getDate(String name) {
@@ -101,13 +108,13 @@ abstract class AbstractGettableData implements GettableData {
     }
 
     public float getFloat(int i) {
-        metadata.checkType(i, DataType.Name.FLOAT);
+        metadata.checkType(i, FLOAT);
 
         ByteBuffer value = getValue(i);
         if (value == null || value.remaining() == 0)
             return 0.0f;
 
-        return TypeCodec.FloatCodec.instance.deserializeNoBoxing(value);
+        return getCodecRegistry().codecFor(cfloat(), Float.class).deserialize(value);
     }
 
     public float getFloat(String name) {
@@ -115,13 +122,13 @@ abstract class AbstractGettableData implements GettableData {
     }
 
     public double getDouble(int i) {
-        metadata.checkType(i, DataType.Name.DOUBLE);
+        metadata.checkType(i, DOUBLE);
 
         ByteBuffer value = getValue(i);
         if (value == null || value.remaining() == 0)
             return 0.0;
 
-        return TypeCodec.DoubleCodec.instance.deserializeNoBoxing(value);
+        return getCodecRegistry().codecFor(cdouble(), Double.class).deserialize(value);
     }
 
     public double getDouble(String name) {
@@ -143,8 +150,13 @@ abstract class AbstractGettableData implements GettableData {
     }
 
     public ByteBuffer getBytes(int i) {
-        metadata.checkType(i, DataType.Name.BLOB);
-        return getBytesUnsafe(i);
+        metadata.checkType(i, BLOB);
+
+        ByteBuffer value = getValue(i);
+        if (value == null)
+            return null;
+
+        return getCodecRegistry().codecFor(blob(), ByteBuffer.class).deserialize(value);
     }
 
     public ByteBuffer getBytes(String name) {
@@ -152,17 +164,13 @@ abstract class AbstractGettableData implements GettableData {
     }
 
     public String getString(int i) {
-        DataType.Name type = metadata.checkType(i, DataType.Name.VARCHAR,
-            DataType.Name.TEXT,
-            DataType.Name.ASCII);
+        metadata.checkType(i, VARCHAR, TEXT, ASCII);
 
         ByteBuffer value = getValue(i);
         if (value == null)
             return null;
 
-        return type == DataType.Name.ASCII
-            ? TypeCodec.StringCodec.asciiInstance.deserialize(value)
-            : TypeCodec.StringCodec.utf8Instance.deserialize(value);
+        return getCodecRegistry().codecFor(metadata.getType(i), String.class).deserialize(value);
     }
 
     public String getString(String name) {
@@ -170,13 +178,13 @@ abstract class AbstractGettableData implements GettableData {
     }
 
     public BigInteger getVarint(int i) {
-        metadata.checkType(i, DataType.Name.VARINT);
+        metadata.checkType(i, VARINT);
 
         ByteBuffer value = getValue(i);
         if (value == null || value.remaining() == 0)
             return null;
 
-        return TypeCodec.BigIntegerCodec.instance.deserialize(value);
+        return getCodecRegistry().codecFor(varint(), BigInteger.class).deserialize(value);
     }
 
     public BigInteger getVarint(String name) {
@@ -184,13 +192,13 @@ abstract class AbstractGettableData implements GettableData {
     }
 
     public BigDecimal getDecimal(int i) {
-        metadata.checkType(i, DataType.Name.DECIMAL);
+        metadata.checkType(i, DECIMAL);
 
         ByteBuffer value = getValue(i);
         if (value == null || value.remaining() == 0)
             return null;
 
-        return TypeCodec.DecimalCodec.instance.deserialize(value);
+        return getCodecRegistry().codecFor(decimal(), BigDecimal.class).deserialize(value);
     }
 
     public BigDecimal getDecimal(String name) {
@@ -198,15 +206,13 @@ abstract class AbstractGettableData implements GettableData {
     }
 
     public UUID getUUID(int i) {
-        DataType.Name type = metadata.checkType(i, DataType.Name.UUID, DataType.Name.TIMEUUID);
+        metadata.checkType(i, UUID, TIMEUUID);
 
         ByteBuffer value = getValue(i);
         if (value == null || value.remaining() == 0)
             return null;
 
-        return type == DataType.Name.UUID
-            ? TypeCodec.UUIDCodec.instance.deserialize(value)
-            : TypeCodec.TimeUUIDCodec.instance.deserialize(value);
+        return getCodecRegistry().codecFor(metadata.getType(i), UUID.class).deserialize(value);
     }
 
     public UUID getUUID(String name) {
@@ -214,13 +220,13 @@ abstract class AbstractGettableData implements GettableData {
     }
 
     public InetAddress getInet(int i) {
-        metadata.checkType(i, DataType.Name.INET);
+        metadata.checkType(i, INET);
 
         ByteBuffer value = getValue(i);
         if (value == null || value.remaining() == 0)
             return null;
 
-        return TypeCodec.InetCodec.instance.deserialize(value);
+        return getCodecRegistry().codecFor(inet(), InetAddress.class).deserialize(value);
     }
 
     public InetAddress getInet(String name) {
@@ -230,18 +236,20 @@ abstract class AbstractGettableData implements GettableData {
     @SuppressWarnings("unchecked")
     public <T> List<T> getList(int i, Class<T> elementsClass) {
         DataType type = metadata.getType(i);
-        if (type.getName() != DataType.Name.LIST)
+        if (type.getName() != LIST)
             throw new InvalidTypeException(String.format("Column %s is not of list type", metadata.getName(i)));
 
-        Class<?> expectedClass = type.getTypeArguments().get(0).getName().javaType;
+        Class<?> expectedClass = getCodecRegistry().codecFor(type.getTypeArguments().get(0)).getJavaType().getRawType();
         if (!elementsClass.isAssignableFrom(expectedClass))
-            throw new InvalidTypeException(String.format("Column %s is a list of %s (CQL type %s), cannot be retrieve as a list of %s", metadata.getName(i), expectedClass, type, elementsClass));
+            throw new InvalidTypeException(String.format("Column %s is a list of %s (CQL type %s), cannot be retrieved as a list of %s", metadata.getName(i), expectedClass, type, elementsClass));
 
         ByteBuffer value = getValue(i);
         if (value == null)
-            return Collections.<T>emptyList();
+            return Collections.emptyList();
 
-        return Collections.unmodifiableList((List<T>)type.codec().deserialize(value));
+        TypeToken<List<T>> javaType = new TypeToken<List<T>>(){}.where(new TypeParameter<T>() {}, elementsClass);
+        List<T> list = getCodecRegistry().codecFor(type, javaType).deserialize(value);
+        return Collections.unmodifiableList(list);
     }
 
     public <T> List<T> getList(String name, Class<T> elementsClass) {
@@ -251,18 +259,20 @@ abstract class AbstractGettableData implements GettableData {
     @SuppressWarnings("unchecked")
     public <T> Set<T> getSet(int i, Class<T> elementsClass) {
         DataType type = metadata.getType(i);
-        if (type.getName() != DataType.Name.SET)
+        if (type.getName() != SET)
             throw new InvalidTypeException(String.format("Column %s is not of set type", metadata.getName(i)));
 
-        Class<?> expectedClass = type.getTypeArguments().get(0).getName().javaType;
+        Class<?> expectedClass = getCodecRegistry().codecFor(type.getTypeArguments().get(0)).getJavaType().getRawType();
         if (!elementsClass.isAssignableFrom(expectedClass))
-            throw new InvalidTypeException(String.format("Column %s is a set of %s (CQL type %s), cannot be retrieve as a set of %s", metadata.getName(i), expectedClass, type, elementsClass));
+            throw new InvalidTypeException(String.format("Column %s is a set of %s (CQL type %s), cannot be retrieved as a set of %s", metadata.getName(i), expectedClass, type, elementsClass));
 
         ByteBuffer value = getValue(i);
         if (value == null)
-            return Collections.<T>emptySet();
+            return Collections.emptySet();
 
-        return Collections.unmodifiableSet((Set<T>)type.codec().deserialize(value));
+        TypeToken<Set<T>> javaType = new TypeToken<Set<T>>(){}.where(new TypeParameter<T>() {}, elementsClass);
+        Set<T> set = getCodecRegistry().codecFor(type, javaType).deserialize(value);
+        return Collections.unmodifiableSet(set);
     }
 
     public <T> Set<T> getSet(String name, Class<T> elementsClass) {
@@ -272,19 +282,23 @@ abstract class AbstractGettableData implements GettableData {
     @SuppressWarnings("unchecked")
     public <K, V> Map<K, V> getMap(int i, Class<K> keysClass, Class<V> valuesClass) {
         DataType type = metadata.getType(i);
-        if (type.getName() != DataType.Name.MAP)
+        if (type.getName() != MAP)
             throw new InvalidTypeException(String.format("Column %s is not of map type", metadata.getName(i)));
 
-        Class<?> expectedKeysClass = type.getTypeArguments().get(0).getName().javaType;
-        Class<?> expectedValuesClass = type.getTypeArguments().get(1).getName().javaType;
+        Class<?> expectedKeysClass = getCodecRegistry().codecFor(type.getTypeArguments().get(0)).getJavaType().getRawType();
+        Class<?> expectedValuesClass = getCodecRegistry().codecFor(type.getTypeArguments().get(1)).getJavaType().getRawType();
         if (!keysClass.isAssignableFrom(expectedKeysClass) || !valuesClass.isAssignableFrom(expectedValuesClass))
-            throw new InvalidTypeException(String.format("Column %s is a map of %s->%s (CQL type %s), cannot be retrieve as a map of %s->%s", metadata.getName(i), expectedKeysClass, expectedValuesClass, type, keysClass, valuesClass));
+            throw new InvalidTypeException(String.format("Column %s is a map of %s->%s (CQL type %s), cannot be retrieved as a map of %s->%s", metadata.getName(i), expectedKeysClass, expectedValuesClass, type, keysClass, valuesClass));
 
         ByteBuffer value = getValue(i);
         if (value == null)
-            return Collections.<K, V>emptyMap();
+            return Collections.emptyMap();
 
-        return Collections.unmodifiableMap((Map<K, V>)type.codec().deserialize(value));
+        TypeToken<Map<K, V>> javaType = new TypeToken<Map<K, V>>(){}
+            .where(new TypeParameter<K>(){}, keysClass)
+            .where(new TypeParameter<V>(){}, valuesClass);
+        Map<K, V> map = getCodecRegistry().codecFor(type, javaType).deserialize(value);
+        return Collections.unmodifiableMap(map);
     }
 
     public <K, V> Map<K, V> getMap(String name, Class<K> keysClass, Class<V> valuesClass) {
@@ -306,10 +320,174 @@ abstract class AbstractGettableData implements GettableData {
                     return null;
             }
         else
-            return type.deserialize(raw);
+            return getCodecRegistry().codecFor(type).deserialize(raw);
     }
 
     public Object getObject(String name) {
         return getObject(metadata.getFirstIdx(name));
     }
+
+
+    // Methods accepting additional parameters to determine the target object's type
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public <T> T getObject(int i, Class<T> targetClass) {
+       return getObject(i, TypeToken.of(targetClass));
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public <T> T getObject(int i, TypeToken<T> targetType) {
+        return getObject(i, getCodecRegistry().codecFor(metadata.getType(i), targetType));
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public <T> T getObject(int i, TypeCodec<T> codec) {
+        ByteBuffer raw = getValue(i);
+        if(raw == null)
+            return null;
+        return codec.deserialize(raw);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public <T> T getObject(String name, Class<T> targetClass) {
+        return getObject(metadata.findFirstIdx(name), targetClass);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public <T> T getObject(String name, TypeToken<T> targetType) {
+        return getObject(metadata.findFirstIdx(name), targetType);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public <T> T getObject(String name, TypeCodec<T> codec) {
+        return getObject(metadata.findFirstIdx(name), codec);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public <T> List<T> getList(int i, TypeToken<List<T>> targetType){
+        return getList(i, getCodecRegistry().codecFor(metadata.getType(i), targetType));
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public <T> List<T> getList(int i, TypeCodec<List<T>> codec){
+        ByteBuffer raw = getValue(i);
+        if(raw == null)
+            return null;
+        return codec.deserialize(raw);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public <T> List<T> getList(String name, TypeToken<List<T>> targetType){
+        return getList(metadata.findFirstIdx(name), targetType);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public <T> List<T> getList(String name, TypeCodec<List<T>> codec){
+        return getList(metadata.findFirstIdx(name), codec);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public <T> Set<T> getSet(int i, TypeToken<Set<T>> targetType){
+        return getSet(i, getCodecRegistry().codecFor(metadata.getType(i), targetType));
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public <T> Set<T> getSet(int i, TypeCodec<Set<T>> codec){
+        ByteBuffer raw = getValue(i);
+        if(raw == null)
+            return null;
+        return codec.deserialize(raw);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public <T> Set<T> getSet(String name, TypeToken<Set<T>> targetType){
+        return getSet(metadata.findFirstIdx(name), targetType);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public <T> Set<T> getSet(String name, TypeCodec<Set<T>> codec){
+        return getSet(metadata.findFirstIdx(name), codec);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public <K, V> Map<K, V> getMap(int i, TypeToken<Map<K, V>> targetType) {
+        return getMap(i, getCodecRegistry().codecFor(metadata.getType(i), targetType));
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public <K, V> Map<K, V> getMap(int i, TypeCodec<Map<K, V>> codec){
+        ByteBuffer raw = getValue(i);
+        if(raw == null)
+            return null;
+        return codec.deserialize(raw);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public <K, V> Map<K, V> getMap(String name, TypeToken<Map<K, V>> targetType){
+        return getMap(metadata.findFirstIdx(name), targetType);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public <K, V> Map<K, V> getMap(String name, TypeCodec<Map<K, V>> codec){
+        return getMap(metadata.findFirstIdx(name), codec);
+    }
+
+    protected CodecRegistry getCodecRegistry() {
+        return codecRegistry;
+    }
+
 }

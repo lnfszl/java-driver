@@ -15,8 +15,9 @@
  */
 package com.datastax.driver.core.querybuilder;
 
-import java.nio.ByteBuffer;
 import java.util.List;
+
+import com.datastax.driver.core.CodecRegistry;
 
 public abstract class Clause extends Utils.Appendeable {
 
@@ -48,9 +49,11 @@ public abstract class Clause extends Utils.Appendeable {
         }
 
         @Override
-        void appendTo(StringBuilder sb, List<ByteBuffer> variables) {
+        void appendTo(StringBuilder sb, List<Object> variables) {
             Utils.appendName(name, sb).append(op);
-            Utils.appendValue(value, sb, variables);
+            // FIXME use configured CodecRegistry
+            CodecRegistry codecRegistry = CodecRegistry.DEFAULT_INSTANCE;
+            Utils.appendValue(value, codecRegistry, sb, variables);
         }
 
         @Override
@@ -79,7 +82,7 @@ public abstract class Clause extends Utils.Appendeable {
         }
 
         @Override
-        void appendTo(StringBuilder sb, List<ByteBuffer> variables) {
+        void appendTo(StringBuilder sb, List<Object> variables) {
 
             // We special case the case of just one bind marker because there is little
             // reasons to do:
@@ -94,7 +97,9 @@ public abstract class Clause extends Utils.Appendeable {
             }
 
             Utils.appendName(name, sb).append(" IN (");
-            Utils.joinAndAppendValues(sb, ",", values, variables).append(')');
+            // FIXME use configured CodecRegistry
+            CodecRegistry codecRegistry = CodecRegistry.DEFAULT_INSTANCE;
+            Utils.joinAndAppendValues(sb, codecRegistry, ",", values, variables).append(')');
         }
 
         @Override
@@ -139,14 +144,14 @@ public abstract class Clause extends Utils.Appendeable {
 
         @Override
         boolean containsBindMarker() {
-            for (int i = 0; i < values.size(); i++)
-                if (Utils.containsBindMarker(values.get(i)))
+            for (Object value : values)
+                if (Utils.containsBindMarker(value))
                     return true;
             return false;
         }
 
         @Override
-        void appendTo(StringBuilder sb, List<ByteBuffer> variables) {
+        void appendTo(StringBuilder sb, List<Object> variables) {
             sb.append("(");
             for (int i = 0; i < names.size(); i++) {
                 if (i > 0)
@@ -154,10 +159,12 @@ public abstract class Clause extends Utils.Appendeable {
                 Utils.appendName(names.get(i), sb);
             }
             sb.append(")").append(op).append("(");
+            // FIXME use configured CodecRegistry
+            CodecRegistry codecRegistry = CodecRegistry.DEFAULT_INSTANCE;
             for (int i = 0; i < values.size(); i++) {
                 if (i > 0)
                     sb.append(",");
-                Utils.appendValue(values.get(i), sb, variables);
+                Utils.appendValue(values.get(i), codecRegistry, sb, variables);
             }
             sb.append(")");
         }

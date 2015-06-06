@@ -143,7 +143,7 @@ class SessionManager extends AbstractSession {
                         switch (rm.kind) {
                             case PREPARED:
                                 Responses.Result.Prepared pmsg = (Responses.Result.Prepared)rm;
-                                PreparedStatement stmt = DefaultPreparedStatement.fromMessage(pmsg, cluster.getMetadata(), query, poolsState.keyspace);
+                                PreparedStatement stmt = DefaultPreparedStatement.fromMessage(pmsg, cluster, query, poolsState.keyspace);
                                 stmt = cluster.manager.addPrepared(stmt);
                                 try {
                                     // All Sessions are connected to the same nodes so it's enough to prepare only the nodes of this session.

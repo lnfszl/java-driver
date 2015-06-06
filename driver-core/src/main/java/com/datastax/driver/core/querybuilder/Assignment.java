@@ -15,8 +15,9 @@
  */
 package com.datastax.driver.core.querybuilder;
 
-import java.nio.ByteBuffer;
 import java.util.List;
+
+import com.datastax.driver.core.CodecRegistry;
 
 import static com.datastax.driver.core.querybuilder.Utils.appendName;
 import static com.datastax.driver.core.querybuilder.Utils.appendValue;
@@ -41,10 +42,12 @@ public abstract class Assignment extends Utils.Appendeable {
         }
 
         @Override
-        void appendTo(StringBuilder sb, List<ByteBuffer> variables) {
+        void appendTo(StringBuilder sb, List<Object> variables) {
             appendName(name, sb);
             sb.append('=');
-            appendValue(value, sb, variables);
+            // FIXME use configured CodecRegistry
+            CodecRegistry codecRegistry = CodecRegistry.DEFAULT_INSTANCE;
+            appendValue(value, codecRegistry, sb, variables);
         }
 
         @Override
@@ -75,10 +78,12 @@ public abstract class Assignment extends Utils.Appendeable {
         }
 
         @Override
-        void appendTo(StringBuilder sb, List<ByteBuffer> variables) {
+        void appendTo(StringBuilder sb, List<Object> variables) {
             appendName(name, sb).append('=');
             appendName(name, sb).append(isIncr ? "+" : "-");
-            appendValue(value, sb, variables);
+            // FIXME use configured CodecRegistry
+            CodecRegistry codecRegistry = CodecRegistry.DEFAULT_INSTANCE;
+            appendValue(value, codecRegistry, sb, variables);
         }
 
         @Override
@@ -102,9 +107,11 @@ public abstract class Assignment extends Utils.Appendeable {
         }
 
         @Override
-        void appendTo(StringBuilder sb, List<ByteBuffer> variables) {
+        void appendTo(StringBuilder sb, List<Object> variables) {
             appendName(name, sb).append('=');
-            appendValue(value, sb, variables);
+            // FIXME use configured CodecRegistry
+            CodecRegistry codecRegistry = CodecRegistry.DEFAULT_INSTANCE;
+            appendValue(value, codecRegistry, sb, variables);
             sb.append('+');
             appendName(name, sb);
         }
@@ -132,9 +139,11 @@ public abstract class Assignment extends Utils.Appendeable {
         }
 
         @Override
-        void appendTo(StringBuilder sb, List<ByteBuffer> variables) {
+        void appendTo(StringBuilder sb, List<Object> variables) {
             appendName(name, sb).append('[').append(idx).append("]=");
-            appendValue(value, sb, variables);
+            // FIXME use configured CodecRegistry
+            CodecRegistry codecRegistry = CodecRegistry.DEFAULT_INSTANCE;
+            appendValue(value, codecRegistry, sb, variables);
         }
 
         @Override
@@ -166,10 +175,12 @@ public abstract class Assignment extends Utils.Appendeable {
         }
 
         @Override
-        void appendTo(StringBuilder sb, List<ByteBuffer> variables) {
+        void appendTo(StringBuilder sb, List<Object> variables) {
             appendName(name, sb).append('=');
             appendName(name, sb).append(isAdd ? "+" : "-");
-            appendValue(collection, sb, variables);
+            // FIXME use configured CodecRegistry
+            CodecRegistry codecRegistry = CodecRegistry.DEFAULT_INSTANCE;
+            appendValue(collection, codecRegistry, sb, variables);
         }
 
         @Override
@@ -195,11 +206,13 @@ public abstract class Assignment extends Utils.Appendeable {
         }
 
         @Override
-        void appendTo(StringBuilder sb, List<ByteBuffer> variables) {
+        void appendTo(StringBuilder sb, List<Object> variables) {
             appendName(name, sb).append('[');
-            appendValue(key, sb, variables);
+            // FIXME use configured CodecRegistry
+            CodecRegistry codecRegistry = CodecRegistry.DEFAULT_INSTANCE;
+            appendValue(key, codecRegistry, sb, variables);
             sb.append("]=");
-            appendValue(value, sb, variables);
+            appendValue(value, codecRegistry, sb, variables);
         }
 
         @Override

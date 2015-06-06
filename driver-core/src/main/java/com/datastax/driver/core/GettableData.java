@@ -21,6 +21,8 @@ import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.*;
 
+import com.google.common.reflect.TypeToken;
+
 import com.datastax.driver.core.exceptions.InvalidTypeException;
 
 /**
@@ -512,4 +514,46 @@ public interface GettableData {
      * @throws IllegalArgumentException if {@code name} is not a valid name for this object.
      */
     Object getObject(String name);
+
+    // Methods accepting custom codecs to retrieve elements
+
+    <T> T getObject(int i, Class<T> targetClass);
+
+    <T> T getObject(int i, TypeToken<T> targetType);
+
+    <T> T getObject(int i, TypeCodec<T> codec);
+
+    <T> T getObject(String name, Class<T> targetClass);
+
+    <T> T getObject(String name, TypeToken<T> targetType);
+
+    <T> T getObject(String name, TypeCodec<T> codec);
+
+
+    <T> List<T> getList(int i, TypeToken<List<T>> targetType);
+
+    <T> List<T> getList(int i, TypeCodec<List<T>> codec);
+
+    <T> List<T> getList(String name, TypeToken<List<T>> targetType);
+
+    <T> List<T> getList(String name, TypeCodec<List<T>> codec);
+
+
+    <T> Set<T> getSet(int i, TypeToken<Set<T>> targetType);
+
+    <T> Set<T> getSet(int i, TypeCodec<Set<T>> codec);
+
+    <T> Set<T> getSet(String name, TypeToken<Set<T>> targetType);
+
+    <T> Set<T> getSet(String name, TypeCodec<Set<T>> codec);
+
+
+    <K, V> Map<K, V> getMap(int i, TypeToken<Map<K, V>> targetType);
+
+    <K, V> Map<K, V> getMap(int i, TypeCodec<Map<K, V>> codec);
+
+    <K, V> Map<K, V> getMap(String name, TypeToken<Map<K, V>> targetType);
+
+    <K, V> Map<K, V> getMap(String name, TypeCodec<Map<K, V>> codec);
+    
 }

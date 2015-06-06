@@ -17,6 +17,8 @@ package com.datastax.driver.core;
 
 import java.nio.ByteBuffer;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import com.datastax.driver.core.exceptions.PagingStateException;
 import com.datastax.driver.core.policies.RetryPolicy;
 import com.datastax.driver.core.querybuilder.BuiltStatement;
@@ -44,6 +46,8 @@ public abstract class Statement {
         }
     };
 
+    protected final Cluster cluster;
+
     private volatile ConsistencyLevel consistency;
     private volatile ConsistencyLevel serialConsistency;
     private volatile boolean traceQuery;
@@ -54,6 +58,11 @@ public abstract class Statement {
 
     // We don't want to expose the constructor, because the code relies on this being only sub-classed by RegularStatement, BoundStatement and BatchStatement
     Statement() {
+        cluster = null;
+    }
+
+    Statement(Cluster cluster) {
+        this.cluster = cluster;
     }
 
     /**
@@ -404,4 +413,9 @@ public abstract class Statement {
         else
             return queryOptions.getDefaultIdempotence();
     }
+
+    public CodecRegistry getCodecRegistry() {
+        return cluster == null ? CodecRegistry.DEFAULT_INSTANCE : cluster.getConfiguration().getCodecRegistry();
+    }
+
 }
